@@ -50,6 +50,16 @@ let browser;
     return {duplicates: ids.length - new Set(ids).size, missing};
   });
   assert.deepEqual(structure, {duplicates: 0, missing: []});
+  assert.equal(await page.locator('.company,#testimoni,[data-count]').count(), 0);
+  const measured = await page.evaluate(() => ({
+    checks: NimbusApp.status.checks,
+    unknown: NimbusApp.status.uptime.filter(day => day.value === null).length,
+    history: document.querySelectorAll('.net-history-item').length
+  }));
+  assert.equal(measured.checks.length, 6);
+  assert(measured.checks.every(check => check.passed && Number.isFinite(check.duration) && check.duration >= 0));
+  assert.equal(measured.unknown, 89);
+  assert.equal(measured.history, 0);
 
   /* Deploy daripada dashboard mesti dikongsi dengan terminal dan log aktiviti. */
   await page.locator('#hero-deploy').focus(); await page.keyboard.press('Enter');
@@ -76,6 +86,7 @@ let browser;
   }
   await input.fill('theme light'); await input.press('Enter');
   assert.equal(await page.getAttribute('html', 'data-theme'), 'light');
+  assert.match(await page.locator('#terminal-output p').last().innerText(), /light/);
   await input.fill('deploy tested-app'); await input.press('Enter');
   await input.fill('lang ms'); await input.press('Enter');
   await page.waitForFunction(() => NimbusApp.terminal.getOperation() === null, null, {timeout: 5000});
@@ -106,7 +117,7 @@ let browser;
     }
     const support = document.querySelector('#ps-support'); support.value = 'sla'; support.dispatchEvent(new Event('change'));
   });
-  assert.equal(await page.locator('#ps-estimate-price').innerText(), 'Contact Us');
+  assert.equal(await page.locator('#ps-estimate-price').innerText(), await page.evaluate(() => NimbusApp.t('ps.calc.contact')));
   await page.locator('[data-billing="yearly"]').click();
   assert.equal(await page.locator('#pro-price').innerText(), '63.20');
   assert.match(await page.locator('#ps-calc-billing').innerText(), /1,113.96/);
@@ -133,6 +144,7 @@ let browser;
   assert.equal(await page.evaluate(() => NimbusApp.network.selected), 'sf');
   await page.locator('#net-origin').selectOption('sf');
   assert.equal(await page.locator('#net-city-latency').innerText(), '8 ms');
+  assert.match(await page.locator('#net-map-link').getAttribute('href'), /openstreetmap\.org/);
   assert.equal(await page.locator('.net-uptime-bar').count(), 90);
   await page.locator('.net-uptime-bar').last().focus(); await page.keyboard.press('Home');
   assert.equal(await page.locator('.net-uptime-bar').first().evaluate(node => node === document.activeElement), true);
@@ -141,6 +153,7 @@ let browser;
   assert.equal(await page.evaluate(() => NimbusApp.status.phase), 0);
   await page.evaluate(() => { for (let i = 0; i < 18; i++) NimbusApp.status.advance(); });
   assert.equal(await page.evaluate(() => NimbusApp.status.phase), 2);
+  assert.equal(await page.locator('.net-history-item').count(), 1);
   await page.locator('#net-trigger-incident').click();
   assert.equal(await page.evaluate(() => NimbusApp.status.phase), -1);
 
