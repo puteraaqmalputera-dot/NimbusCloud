@@ -1,206 +1,188 @@
-/* Ujian fungsi halaman sebenar; Playwright digunakan sebagai alat pembangunan. */
+/* Ujian fungsi sebenar; Playwright hanya digunakan sebagai alat pembangunan. */
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const {chromium} = require('playwright');
-const source = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const { chromium } = require('playwright');
+const site = process.env.NIMBUS_ROOT || path.resolve(__dirname, '..');
+const files = Object.fromEntries(['index.html', 'styles.css', 'app.js'].map(name => [name, fs.readFileSync(path.join(site, name), 'utf8')]));
 const executablePath = process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined);
+const errors = [], unexpected = [], results = [];
+const exposed = '\nwindow.NimbusTest = { calculatePrice, Clock, CloudModel, t, i18n, setLanguage, missingTranslations };';
 let browser;
 
-(async () => {
-  browser = await chromium.launch({headless: true, executablePath, args: ['--no-sandbox']});
-  const failures = [];
-  async function open(locale = 'en-MY', viewport = {width: 1280, height: 900}) {
-    const context = await browser.newContext({locale, viewport});
-    const page = await context.newPage();
-    page.on('pageerror', error => failures.push(error.message));
-    page.on('console', message => { if (message.type() === 'error') failures.push(message.text()); });
-    await page.route('http://nimbus.test/**', route => route.fulfill({status: 200, contentType: 'text/html', body: source}));
-    await page.route(/https:\/\/fonts\.(googleapis|gstatic)\.com\//, route => route.fulfill({status: 200, contentType: 'text/css', body: ''}));
-    await page.goto('http://nimbus.test/');
-    await page.waitForFunction(() => !!window.NimbusApp);
-    return {context, page};
-  }
+async function open({ locale = 'en-US', width = 1280, motion = 'reduce' } = {}) {
+  const context = await browser.newContext({ locale, viewport: { width, height: 900 }, reducedMotion: motion });
+  await context.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (['fonts.googleapis.com', 'fonts.gstatic.com'].includes(url.hostname)) return route.fulfill({ contentType: 'text/css', body: '' });
+    if (url.hostname === 'nimbus.test') {
+      const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
+      if (Object.hasOwn(files, name)) return route.fulfill({ contentType: name.endsWith('.js') ? 'text/javascript' : name.endsWith('.css') ? 'text/css' : 'text/html', body: files[name] + (name === 'app.js' ? exposed : '') });
+    }
+    unexpected.push(route.request().url());
+    return route.abort();
+  });
+  const page = await context.newPage();
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (['warning', 'error'].includes(message.type())) errors.push(message.text()); });
+  await page.goto('http://nimbus.test/');
+  await page.waitForSelector('html.app-ready');
+  return { context, page };
+}
+const state = page => page.evaluate(() => NimbusState.get());
+async function range(page, id, value) { await page.locator('#' + id).evaluate((node, number) => { node.value = number; node.dispatchEvent(new Event('input', { bubbles: true })); }, String(value)); }
+async function hidden(page, value) { await page.evaluate(isHidden => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => isHidden }); document.dispatchEvent(new Event('visibilitychange')); }, value); }
+async function closeToasts(page) { await page.locator('.toast-close').evaluateAll(nodes => nodes.forEach(node => node.click())); }
+async function finishDeploy(page) { await page.waitForFunction(() => !NimbusState.get().deploying && !document.getElementById('deploy-button').disabled, null, { timeout: 15000 }); }
 
-  /* Bahasa awal dan pilihan tersimpan diuji pada asal pelayar yang sebenar. */
-  for (const [locale, expected] of [['ms-MY', 'ms'], ['id-ID', 'ms'], ['en-US', 'en']]) {
-    const {context, page} = await open(locale);
-    assert.equal(await page.getAttribute('html', 'lang'), expected, locale);
+(async () => {
+  browser = await chromium.launch({ executablePath, headless: true, args: executablePath ? ['--no-sandbox'] : [] });
+
+  /* Bahasa asal, pilihan tersimpan dan semantik diuji pada asal HTTP. */
+  for (const [locale, expected] of [['en-US', 'en'], ['ms-MY', 'ms'], ['id-ID', 'ms']]) {
+    const { page, context } = await open({ locale });
+    assert.equal(await page.getAttribute('html', 'lang'), expected);
+    await page.evaluate(() => NimbusTest.setLanguage('ms'));
+    await page.reload();
+    assert.equal(await page.getAttribute('html', 'lang'), 'ms');
     await context.close();
   }
-  const {context, page} = await open();
-  await page.evaluate(() => NimbusApp.setLanguage('ms'));
-  await page.reload();
-  assert.equal(await page.getAttribute('html', 'lang'), 'ms');
-  await page.evaluate(() => NimbusApp.setLanguage('en'));
-  await page.reload();
-  assert.equal(await page.getAttribute('html', 'lang'), 'en');
-
+  const { page, context } = await open();
   const structure = await page.evaluate(() => {
     const ids = [...document.querySelectorAll('[id]')].map(node => node.id);
     const missing = [];
-    for (const node of document.querySelectorAll('[href],[aria-controls],[aria-labelledby],[aria-describedby]')) {
-      for (const attribute of ['href', 'aria-controls', 'aria-labelledby', 'aria-describedby']) {
-        const value = node.getAttribute(attribute) || '';
-        const refs = attribute === 'href' ? (value.startsWith('#') ? [value.slice(1)] : []) : value.split(/\s+/).filter(Boolean);
-        missing.push(...refs.filter(id => !document.getElementById(id)));
-      }
+    for (const node of document.querySelectorAll('[href],[aria-controls],[aria-labelledby],[aria-describedby]')) for (const attribute of ['href', 'aria-controls', 'aria-labelledby', 'aria-describedby']) {
+      const value = node.getAttribute(attribute) || '';
+      const refs = attribute === 'href' ? (value.startsWith('#') ? [value.slice(1)] : []) : value.split(/\s+/).filter(Boolean);
+      missing.push(...refs.filter(id => !document.getElementById(id)));
     }
-    return {duplicates: ids.length - new Set(ids).size, missing};
+    return { duplicate: ids.length - new Set(ids).size, missing, keys: NimbusTest.missingTranslations.size };
   });
-  assert.deepEqual(structure, {duplicates: 0, missing: []});
-  assert.equal(await page.locator('.company,#testimoni,[data-count]').count(), 0);
-  const measured = await page.evaluate(() => ({
-    checks: NimbusApp.status.checks,
-    unknown: NimbusApp.status.uptime.filter(day => day.value === null).length,
-    history: document.querySelectorAll('.net-history-item').length
-  }));
-  assert.equal(measured.checks.length, 6);
-  assert(measured.checks.every(check => check.passed && Number.isFinite(check.duration) && check.duration >= 0));
-  assert.equal(measured.unknown, 89);
-  assert.equal(measured.history, 0);
+  assert.deepEqual(structure, { duplicate: 0, missing: [], keys: 0 });
 
-  /* Deploy daripada dashboard mesti dikongsi dengan terminal dan log aktiviti. */
-  await page.locator('#hero-deploy').focus(); await page.keyboard.press('Enter');
-  assert.equal(await page.evaluate(() => NimbusState.data.deployments.length), 1);
-  assert.equal(await page.locator('.hero-live-feed li').count(), 1);
-  assert.equal(await page.locator('.deploy-toast').getAttribute('aria-hidden'), 'false');
-  await page.locator('#terminal').scrollIntoViewIfNeeded();
-  const input = page.locator('#terminal-input');
-  for (const command of ['help', 'status', 'regions', 'logs', 'whoami']) {
-    await input.fill(command); await input.press('Enter');
-  }
-  assert.match(await page.locator('#terminal-output').innerText(), /my-app/);
-  await input.fill('sta'); await input.press('Tab');
-  assert.equal(await input.inputValue(), 'status ');
-  await input.fill('scale 5'); await input.press('Enter');
-  assert.equal(await page.evaluate(() => NimbusState.data.instances), 5);
-  const cpu = await page.evaluate(() => NimbusState.data.cpu);
-  assert(Math.abs(parseFloat(await page.locator('.hero-live-value').first().innerText()) - cpu) < .2);
-  await input.press('ArrowUp'); assert.equal(await input.inputValue(), 'scale 5');
-  await input.press('ArrowDown'); assert.equal(await input.inputValue(), '');
-  for (const command of ['scale 0', 'scale 21', 'scale a', 'theme wrong', 'lang zz', 'deploy bad_name', 'status extra', 'deply']) {
-    await input.fill(command); await input.press('Enter');
-    assert(await page.locator('#terminal-output p').last().evaluate(node => node.classList.contains('error')), command);
-  }
-  await input.fill('theme light'); await input.press('Enter');
+  /* Angka rujukan dan pecahan mesti sepadan hingga sen terakhir. */
+  const prices = await page.evaluate(() => {
+    const run = NimbusTest.calculatePrice;
+    return {
+      initial: run({ instances: 3, storage: 100, bandwidth: 3, support: 'priority' }),
+      annual: run({ instances: 3, storage: 100, bandwidth: 3, support: 'priority' }, 'yearly'),
+      free: run({ instances: 1, storage: 1, bandwidth: 0, support: 'community' }),
+      floor: run({ instances: 2, storage: 1, bandwidth: 0, support: 'community' }),
+      maximum: run({ instances: 50, storage: 1000, bandwidth: 50, support: 'sla' }),
+      maximumAnnual: run({ instances: 50, storage: 1000, bandwidth: 50, support: 'sla' }, 'yearly')
+    };
+  });
+  assert.equal(prices.initial.total, 103.45); assert.equal(prices.annual.total, 82.76);
+  assert.equal(prices.free.total, 0); assert.equal(prices.free.plan, 'starter'); assert.equal(prices.floor.total, 79);
+  assert.equal(prices.maximum.total, 1530.45); assert.equal(prices.maximumAnnual.total, 1224.36); assert.equal(prices.maximum.contact, true);
+  for (const result of Object.values(prices)) assert.equal(Object.values(result.costs).reduce((sum, amount) => sum + Math.round(amount * 100), 0), Math.round(result.total * 100));
+  await page.locator('#calc-instances').focus(); await page.keyboard.press('ArrowRight');
+  assert.equal(await page.locator('#calc-instances').inputValue(), '4');
+  await page.keyboard.press('Shift+ArrowRight'); assert.equal(await page.locator('#calc-instances').inputValue(), '14');
+  assert.match(await page.locator('#calculator-total').textContent(), /Contact us/);
+  await range(page, 'calc-instances', 3); await page.locator('[data-billing=yearly]').click();
+  assert.match(await page.locator('#calculator-total .sr-only').textContent(), /82\.76/);
+  assert.match(await page.locator('[data-plan-price=pro] .sr-only').textContent(), /63\.20/);
+  await page.locator('[data-select-plan=pro]').click();
+  assert.equal((await state(page)).selectedPlan, 'pro');
+  await page.locator('#cancel-plan-button').click(); await page.locator('#confirm-action').click();
+  await page.waitForFunction(() => !document.getElementById('confirm-dialog').open);
+  assert.equal((await state(page)).selectedPlan, 'starter');
+  await page.locator('.toast-action:not([hidden])').last().click(); assert.equal((await state(page)).selectedPlan, 'pro');
+
+  /* Polisi statik tetap berfungsi apabila gerakan dikurangkan. */
+  await page.locator('#auto-scaling').uncheck();
+  await page.evaluate(() => NimbusTest.CloudModel.setInstances(1));
+  await range(page, 'traffic-load', 2000);
+  assert.equal((await state(page)).cpu, 100); assert((await state(page)).latency > 100);
+  await page.locator('#auto-scaling').check();
+  assert.equal((await state(page)).instances, 20);
+  await range(page, 'traffic-load', 0); assert.equal((await state(page)).instances, 1);
+  await range(page, 'traffic-load', 100); await page.locator('[data-action=spike]').click();
+  assert.equal((await state(page)).load, 1000); assert((await state(page)).instances > 1);
+  assert.equal(await page.locator('#instance-grid [data-instance]').count(), 20);
+  await page.locator('[data-instance="1"]').focus(); await page.keyboard.press('End');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.instance), '20');
+
+  /* Peta, palet arahan dan FAQ boleh digunakan tanpa tetikus. */
+  await page.locator('[data-region-select=sfo]').click(); assert.equal((await state(page)).region, 'sfo');
+  await page.locator('.network-node[data-region=sfo]').focus(); await page.keyboard.press('ArrowRight');
+  assert.notEqual((await state(page)).region, 'sfo');
+  await page.locator('#faq-q-security').focus(); await page.keyboard.press('Enter');
+  assert.equal(await page.locator('.faq-question[aria-expanded=true]').count(), 1);
+  assert.equal(await page.locator('#faq-q-security').getAttribute('aria-expanded'), 'true');
+  await page.keyboard.press('Control+k'); await page.locator('#palette-search').fill('zzzzzzzzzz');
+  assert(await page.locator('#palette-empty').isVisible());
+  await page.locator('#palette-search').fill('prcng'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Home'); await page.keyboard.press('Enter');
+  assert.equal(await page.locator('#command-palette').evaluate(node => node.open), false);
+  assert.equal(await page.evaluate(() => location.hash), '#pricing');
+  await page.keyboard.press('Control+k'); await page.locator('#palette-search').fill('theme'); await page.keyboard.press('Enter');
   assert.equal(await page.getAttribute('html', 'data-theme'), 'light');
-  assert.match(await page.locator('#terminal-output p').last().innerText(), /light/);
-  await input.fill('deploy tested-app'); await input.press('Enter');
-  await input.fill('lang ms'); await input.press('Enter');
-  await page.waitForFunction(() => NimbusApp.terminal.getOperation() === null, null, {timeout: 5000});
-  assert.equal(await page.evaluate(() => NimbusState.data.deployments.at(-1).name), 'tested-app');
-  assert.match(await page.locator('.hero-live-feed').innerText(), /tested-app/);
-  await input.press('Control+l');
-  assert.equal(await page.locator('#terminal-output p').count(), 0);
-  assert((await page.evaluate(() => NimbusApp.terminal.getHistory())).includes('deploy tested-app'));
-  await input.fill('help'); await input.press('Enter');
-  await input.fill('clear'); await input.press('Enter');
-  assert.equal(await page.locator('#terminal-output p').count(), 0);
+  await page.keyboard.press('Control+k'); await page.locator('#palette-search').fill('language'); await page.keyboard.press('Enter');
+  assert.equal(await page.getAttribute('html', 'lang'), 'ms');
+  assert.match(await page.title(), /Papan Pemuka/);
+  await page.evaluate(() => NimbusTest.setLanguage('en'));
+  await page.locator('[data-feature=security] summary').click(); await page.locator('[data-policy=tls]').uncheck();
+  assert.match(await page.locator('#policy-result').textContent(), /2 of 3/);
+  await page.locator('[data-feature=backups] summary').click(); await page.locator('[data-action=backup]').click();
+  assert.equal(await page.locator('#snapshot-list li').count(), 1);
+  await page.locator('[data-feature=support] summary').click(); await page.locator('[data-action=support]').click();
+  await page.locator('#support-form button[type=submit]').click(); assert.equal(await page.locator('#support-message').getAttribute('aria-invalid'), 'true');
+  await page.locator('#support-message').fill('The sample release needs a region check.'); await page.locator('#support-form button[type=submit]').click();
+  assert.match(await page.locator('#support-result').textContent(), /Nothing was sent/); await page.keyboard.press('Escape');
+  await page.locator('#signup-form button[type=submit]').click(); assert.equal(await page.locator('#signup-email').getAttribute('aria-invalid'), 'true');
+  await page.locator('#signup-email').fill('student@example.com'); await page.locator('#signup-form button[type=submit]').click();
+  await page.waitForFunction(() => document.getElementById('signup-message').textContent.includes('Nothing was sent'));
+  assert.equal(await page.locator('#signup-email').inputValue(), '');
+  assert.equal(await page.locator('#terminal-command').textContent(), 'nimbus deploy my-app');
+  assert.equal(await page.locator('#terminal-output .is-pending').count(), 0);
+  await closeToasts(page); const jobs = await page.evaluate(() => NimbusTest.Clock.size);
+  for (let index = 0; index < 5; index++) { await page.keyboard.press('Control+k'); await page.keyboard.press('Escape'); }
+  assert((await page.evaluate(() => NimbusTest.Clock.size)) <= jobs, 'Closing command palette must not leave extra timer jobs.');
+  assert.equal(await page.evaluate(() => NimbusTest.missingTranslations.size), 0);
+  await context.close();
 
-  /* Formula dan kawalan kalkulator diuji pada kedua-dua sempadan. */
-  await page.emulateMedia({reducedMotion: 'reduce'});
-  await page.evaluate(() => NimbusApp.setLanguage('en'));
-  const prices = await page.evaluate(() => [
-    calculateNimbusPrice({projects: 1, storage: 1, traffic: 0, support: 'community'}),
-    calculateNimbusPrice({projects: 50, storage: 1000, traffic: 50, support: 'sla'}),
-    calculateNimbusPrice({projects: 50, storage: 1000, traffic: 50, support: 'sla'}, 'yearly')
-  ]);
-  assert.equal(prices[0].total, 0); assert.equal(prices[0].plan, 'Starter');
-  assert.equal(prices[1].total, 1392.45); assert.equal(prices[1].contact, true);
-  assert.equal(prices[2].total, 1113.96); assert.equal(prices[2].annualTotal, 13367.52);
-  await page.locator('#kalkulator').scrollIntoViewIfNeeded();
-  await page.evaluate(() => {
-    for (const [id, value] of Object.entries({'ps-projects': 50, 'ps-storage': 1000, 'ps-traffic': 50})) {
-      const node = document.getElementById(id); node.value = value; node.dispatchEvent(new Event('input'));
+  /* Masa aktif: tab tersembunyi tidak menggunakan sela atau kemajuan deploy. */
+  const live = await open({ motion: 'no-preference' }); const p = live.page;
+  await p.locator('#dashboard').scrollIntoViewIfNeeded(); await p.waitForTimeout(1200);
+  await hidden(p, true); const paused = JSON.stringify(await state(p)); await p.waitForTimeout(1100);
+  assert.equal(JSON.stringify(await state(p)), paused); await hidden(p, false);
+  const count = (await state(p)).servers.length; await p.locator('#deploy-button').click();
+  await p.waitForTimeout(500); assert((await state(p)).deployProgress > 0);
+  await hidden(p, true); const progress = (await state(p)).deployProgress; await p.waitForTimeout(900);
+  assert.equal((await state(p)).deployProgress, progress); await hidden(p, false); await finishDeploy(p);
+  assert.equal((await state(p)).servers.length, count + 1);
+  await p.locator('.toast-action:not([hidden])').last().click(); assert.equal((await state(p)).servers.length, count);
+  await p.locator('#deploy-button').click(); await p.locator('#cancel-deploy').click(); await finishDeploy(p);
+  assert.equal((await state(p)).servers.length, count);
+  await closeToasts(p); await p.locator('#auto-scaling').uncheck();
+  await p.evaluate(() => NimbusTest.CloudModel.setInstances(1)); await range(p, 'traffic-load', 100);
+  await p.locator('#auto-scaling').check(); assert.equal((await state(p)).instances, 2);
+  await range(p, 'traffic-load', 1000); assert.equal((await state(p)).instances, 2);
+  await p.waitForTimeout(1100); assert.equal((await state(p)).instances, 2);
+  await hidden(p, true); await p.waitForTimeout(1000); assert.equal((await state(p)).instances, 2); await hidden(p, false);
+  await p.evaluate(() => document.getElementById('get-started').scrollIntoView({ behavior: 'instant' }));
+  await p.waitForTimeout(1200); assert.equal((await state(p)).instances, 2);
+  await p.evaluate(() => document.getElementById('scaling').scrollIntoView({ behavior: 'instant' }));
+  await p.waitForFunction(() => NimbusState.get().instances > 2, null, { timeout: 6000 });
+  assert((await state(p)).instances <= 20);
+  await p.locator('#terminal').scrollIntoViewIfNeeded(); await p.locator('[data-action=terminal-replay]').click();
+  await p.waitForTimeout(300); await p.locator('#terminal-pause').click();
+  const terminal = await p.locator('#terminal-command').textContent(); await p.waitForTimeout(500);
+  assert.equal(await p.locator('#terminal-command').textContent(), terminal);
+  await live.context.close();
+
+  /* Susun atur kedua-dua bahasa dan tema mesti muat pada telefon dan desktop. */
+  for (const width of [360, 768, 1280, 1440]) {
+    const current = await open({ width });
+    for (const language of ['en', 'ms']) for (const theme of ['dark', 'light']) {
+      await current.page.evaluate(({ language, theme }) => { NimbusTest.setLanguage(language); document.documentElement.dataset.theme = theme; }, { language, theme });
+      assert.equal(await current.page.evaluate(() => document.documentElement.scrollWidth), width);
+      results.push({ width, language, theme });
     }
-    const support = document.querySelector('#ps-support'); support.value = 'sla'; support.dispatchEvent(new Event('change'));
-  });
-  assert.equal(await page.locator('#ps-estimate-price').innerText(), await page.evaluate(() => NimbusApp.t('ps.calc.contact')));
-  await page.locator('[data-billing="yearly"]').click();
-  assert.equal(await page.locator('#pro-price').innerText(), '63.20');
-  assert.match(await page.locator('#ps-calc-billing').innerText(), /1,113.96/);
-
-  /* Penskalaan manual, overload, cooldown dan panjang carta. */
-  await page.evaluate(() => { NimbusApp.scaling.setAuto(false); NimbusApp.scaling.setTraffic(2000); });
-  assert.equal(await page.locator('#ps-cpu').innerText(), '100%');
-  assert.equal(await page.locator('#ps-overload').isHidden(), false);
-  await page.evaluate(() => { NimbusApp.scaling.setTraffic(120); NimbusState.set({instances: 3}); NimbusState.set({instances: 5}); });
-  assert.equal(await page.locator('#ps-cpu').innerText(), '24%');
-  assert.equal(await page.evaluate(() => NimbusApp.scaling.cooldown), 4);
-  await page.evaluate(() => { NimbusApp.scaling.setAuto(true); NimbusApp.scaling.spike(); NimbusApp.scaling.tick(1000); });
-  assert.equal(await page.evaluate(() => NimbusState.data.instances), 5);
-  await page.evaluate(() => { for (let i = 0; i < 3; i++) NimbusApp.scaling.tick(1000); });
-  assert(await page.evaluate(() => NimbusState.data.instances > 5));
-  assert.equal(await page.evaluate(() => NimbusApp.scaling.history.length), 60);
-  assert.equal(await page.evaluate(() => NimbusApp.hero.getSeries().length), 60);
-
-  /* Peta dan jalur uptime boleh dikendalikan dengan papan kekunci. */
-  await page.locator('#global').scrollIntoViewIfNeeded();
-  assert.equal(await page.locator('.net-map-point').count(), 8);
-  const location = page.locator('.net-map-point[data-location="sf"]');
-  await location.focus(); await location.press('Enter');
-  assert.equal(await page.evaluate(() => NimbusApp.network.selected), 'sf');
-  await page.locator('#net-origin').selectOption('sf');
-  assert.equal(await page.locator('#net-city-latency').innerText(), '8 ms');
-  assert.match(await page.locator('#net-map-link').getAttribute('href'), /openstreetmap\.org/);
-  assert.equal(await page.locator('.net-uptime-bar').count(), 90);
-  await page.locator('.net-uptime-bar').last().focus(); await page.keyboard.press('Home');
-  assert.equal(await page.locator('.net-uptime-bar').first().evaluate(node => node === document.activeElement), true);
-  await page.locator('#net-trigger-incident').scrollIntoViewIfNeeded();
-  await page.locator('#net-trigger-incident').focus(); await page.keyboard.press('Enter');
-  assert.equal(await page.evaluate(() => NimbusApp.status.phase), 0);
-  await page.evaluate(() => { for (let i = 0; i < 18; i++) NimbusApp.status.advance(); });
-  assert.equal(await page.evaluate(() => NimbusApp.status.phase), 2);
-  assert.equal(await page.locator('.net-history-item').count(), 1);
-  await page.locator('#net-trigger-incident').click();
-  assert.equal(await page.evaluate(() => NimbusApp.status.phase), -1);
-
-  /* Tugas mesti berhenti di luar skrin dan apabila tab tersembunyi. */
-  await page.emulateMedia({reducedMotion: 'no-preference'});
-  await page.locator('#scaling').scrollIntoViewIfNeeded(); await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(() => NimbusApp.scheduler.inspect().find(task => task.id === 'scaling-live').running), true);
-  await page.evaluate(() => scrollTo(0, 0)); await page.waitForTimeout(150);
-  const elapsed = await page.evaluate(() => NimbusApp.scaling.elapsed);
-  await page.waitForTimeout(1100);
-  assert.equal(await page.evaluate(() => NimbusApp.scaling.elapsed), elapsed);
-  await page.evaluate(() => { Object.defineProperty(document, 'hidden', {configurable: true, get: () => true}); document.dispatchEvent(new Event('visibilitychange')); });
-  assert.equal(await page.evaluate(() => NimbusApp.scheduler.inspect().some(task => task.running)), false);
-  await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); });
-  await page.emulateMedia({reducedMotion: 'reduce'});
-  await page.evaluate(() => { NimbusApp.scaling.setAuto(false); NimbusApp.scaling.setTraffic(2000); });
-  assert.equal(await page.locator('#ps-cpu').innerText(), '100%');
-
-  /* Bahasa, tema, metadata dan susun atur disemak dalam semua kombinasi. */
-  for (const lang of ['ms', 'en']) for (const theme of ['dark', 'light']) for (const width of [360, 768, 1280]) {
-    await page.setViewportSize({width, height: 900});
-    await page.evaluate(({lang, theme}) => { NimbusApp.setLanguage(lang); NimbusApp.setTheme(theme, false); }, {lang, theme});
-    await page.waitForTimeout(30);
-    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${lang}/${theme}/${width}`);
-    const invalid = await page.evaluate(() => {
-      const dictionary = i18n[NimbusApp.lang], issues = [];
-      for (const node of document.querySelectorAll('[data-i18n]')) if (!Object.hasOwn(dictionary, node.dataset.i18n)) issues.push(node.dataset.i18n);
-      for (const attribute of ['aria-label', 'aria-roledescription', 'placeholder', 'title', 'content']) {
-        for (const node of document.querySelectorAll('[data-i18n-' + attribute + ']')) {
-          const key = node.getAttribute('data-i18n-' + attribute); if (!Object.hasOwn(dictionary, key)) issues.push(key);
-        }
-      }
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      let node;
-      while ((node = walker.nextNode())) if (!node.parentElement.closest('script,style') && /\{\w+\}|^(?:base|term|core|ps|net|heroLive)\.\w+$/.test(node.textContent.trim())) issues.push(node.textContent);
-      return issues;
-    });
-    assert.deepEqual(invalid, [], `${lang}: terjemahan lengkap`);
-    assert.equal(await page.getAttribute('html', 'lang'), lang);
-    assert.equal(await page.locator('.creator-credit').innerText(), 'Created by Putera MY');
+    await current.context.close();
   }
-  await page.locator('#terminal').scrollIntoViewIfNeeded();
-  assert.notEqual(await page.evaluate(() => document.activeElement.id), 'terminal-input');
-  await page.locator('[data-command="scale 5"]').click();
-  assert.equal(await page.evaluate(() => NimbusState.data.instances), 5);
-  assert.notEqual(await page.evaluate(() => document.activeElement.id), 'terminal-input');
-  assert.deepEqual(failures, [], 'Tiada ralat halaman atau konsol');
-  await context.close(); await browser.close(); browser = null;
-  console.log('LULUS: terminal, harga, keadaan bersama, peta, status, pemasa, bahasa, tema dan 12 kombinasi responsif.');
-})().catch(async error => { console.error(error); if (browser) await browser.close(); process.exitCode = 1; });
+  assert.deepEqual(errors, []); assert.deepEqual(unexpected, []);
+  console.log(JSON.stringify({ status: 'PASS', responsiveCases: results.length, priceCases: Object.keys(prices).length, consoleErrors: errors, unexpectedRequests: unexpected, fonts: 'Google Fonts stubbed; fallback fonts tested.' }, null, 2));
+})().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => { await browser?.close(); });
