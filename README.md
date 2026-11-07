@@ -1,6 +1,6 @@
 # NimbusCloud
 
-Portfolio front-end interaktif oleh **Putera MY**. NimbusCloud ialah platform awan fiksyen; semua metrik, harga dan keluaran deploy ialah data contoh yang dikira dalam pelayar. Tiada sumber awan, akaun, pembayaran atau mesej sokongan diwujudkan.
+Portfolio front-end interaktif oleh **Putera MY**. NimbusCloud ialah platform awan fiksyen. Metrik dashboard, harga dan keluaran deploy ialah data contoh yang dikira dalam pelayar; bahagian status penyedia membaca API awam rasmi Vercel, GitHub dan Cloudflare. Tiada sumber awan, akaun, pembayaran atau mesej sokongan diwujudkan.
 
 - Laman: https://nimbuscloud-eta.vercel.app/
 - Sumber: https://github.com/puteraaqmalputera-dot/NimbusCloud
@@ -25,12 +25,16 @@ Buka http://localhost:8080/. Google Fonts membekalkan Inter Tight, Inter dan Jet
 | `app.js` | Kamus BM/EN, keadaan bersama, penjadual, carta canvas dan semua interaksi. |
 | `README.md` | Panduan menjalankan, mengubah dan menerbitkan projek. |
 | `tests/verify.cjs` | Ujian tingkah laku pelayar menggunakan Playwright sebagai alat pembangunan. |
+| `tests/visual.cjs` | Perbandingan piksel tangkapan skrin dengan PNG rujukan yang disemak. |
+| `tests/visual-baselines/system/` | PNG baseline dan manifest persekitaran ujian visual. |
 
 `app.js` dibahagikan dengan komen bernombor. `NimbusState` menyimpan keadaan yang dikongsi; `CloudModel` mengira beban; `Clock` mengurus masa aktif. Fungsi `setupDashboard()` dan `setupFeatures()` memasang alat selepas markup tersedia.
 
 ## Interaksi
 
 - **Dashboard langsung:** CPU, memori, trafik dan latensi berubah secara beransur. Carta mengekalkan 60 sampel dan menyokong penuding serta kekunci kiri/kanan, Home, End dan Esc.
+- **Jeda dan eksport CSV:** jeda kemas kini automatik sambil memeriksa carta atau mengeksport sampel yang sedang dipaparkan. Fail CSV mengandungi maksimum 60 rekod, pengepala BM/EN, BOM UTF-8, CRLF dan tiga tempat perpuluhan. Jarak sampel ialah bilangan rekod sebelum sampel terkini; ia tidak mendakwa masa sebenar antara rekod. URL muat turun sementara dibersihkan selepas digunakan.
+- **Status penyedia sebenar:** tiga API rasmi dibaca apabila panel kelihatan. Setiap sumber memaparkan status, masa semakan pada peranti dan masa kemas kini yang diberikan penyedia. Respons gagal atau lama dilabel dengan jelas dan tidak digantikan dengan status sihat.
 - **Urutan deploy:** klon, bina, semak dan hantar ke tiga wilayah contoh. Kemajuan menggunakan 3.9 saat aktif, boleh dibatalkan, diulang dan dibuat asal. Kejayaan menambah satu baris pelayan serta lonjakan trafik sementara. URL `.example` sengaja menunjukkan keluaran contoh yang tidak dihoskan.
 - **Cerita skrol:** empat peringkat keluaran dalam paparan melekat pada desktop; telefon dan gerakan minimum memaparkan urutan lengkap secara bertindan.
 - **Penskalaan:** gelangsar trafik, lonjakan 10×, polisi hidup/mati, 20 sel instance, CPU, latensi, kos sejam dan log peristiwa berkongsi model dengan dashboard.
@@ -64,7 +68,21 @@ Had input ialah 50 instance, 1,000 GB dan 50 TB. Pada semua nilai maksimum denga
 
 Tema asal ialah gelap. Bahasa awal mengikuti `navigator.language`: `ms` atau `id` memilih BM; bahasa lain memilih EN. Pilihan pengguna disimpan dengan `try/catch` menggunakan hanya `nimbus-theme` dan `nimbus-language` dalam `localStorage`.
 
-Keadaan alat, snapshot dan senarai pelayan berada dalam memori halaman. Borang emel mengosongkan alamat selepas semakan. Borang sokongan dikosongkan apabila dialog ditutup. Tiada analitik, permintaan API, penyimpanan emel atau backend dipasang.
+Keadaan alat, snapshot dan senarai pelayan berada dalam memori halaman. Borang emel mengosongkan alamat selepas semakan. Borang sokongan dikosongkan apabila dialog ditutup. Tiada analitik, penyimpanan emel atau backend dipasang. Panel status membuat permintaan GET tanpa kelayakan akses kepada tiga API awam yang disenaraikan di bawah; tiada token rahsia diperlukan.
+
+## Sumber API sebenar
+
+| Penyedia | Endpoint | Dokumentasi rasmi |
+| --- | --- | --- |
+| Vercel | `https://www.vercel-status.com/api/v2/status.json` | https://www.vercel-status.com/api/v2 |
+| GitHub | `https://www.githubstatus.com/api/v2/status.json` | https://www.githubstatus.com/api |
+| Cloudflare | `https://www.cloudflarestatus.com/api/v2/status.json` | https://www.cloudflarestatus.com/api |
+
+Ketiga-tiga endpoint diuji dengan respons HTTP 200 dan CORS pelayar sebenar. Permintaan menggunakan `credentials: 'omit'`, pembatalan selepas lapan saat dan sela semakan 60 saat semasa panel serta tab kelihatan. Sela ini ialah pilihan aplikasi, bukan dakwaan had kadar rasmi penyedia. Respons disimpan dalam memori selama 60 saat; butang segar semula membolehkan semakan manual. Tab tersembunyi atau panel di luar skrin membatalkan permintaan yang masih berjalan.
+
+`parseProviderStatus()` hanya menerima penunjuk `none`, `minor`, `major` atau `critical`. Data luaran dipaparkan sebagai teks; URL sumber datang daripada konfigurasi tetap. Masa “disemak” ialah masa respons diterima pada peranti. Masa kemas kini penyedia dipaparkan berasingan kerana `page.updated_at` boleh jauh lebih lama daripada respons HTTP terkini. Jika semakan gagal, hasil terakhir dilabel sebagai data terakhir atau status tidak dapat disahkan.
+
+API ini melaporkan kesihatan perkhidmatan penyedia. CPU, memori dan trafik NimbusCloud masih menggunakan model contoh; tiada API ini membekalkan metrik pelayan milik NimbusCloud.
 
 `Clock` menggunakan satu gelung `requestAnimationFrame` dengan `IntersectionObserver`, Page Visibility API dan `prefers-reduced-motion`. Ia tidak menggunakan `setInterval`. Carta, denyutan status dan aktiviti peta berhenti apabila tidak kelihatan. Gerakan minimum mengekalkan semua fungsi dan memaparkan keadaan lengkap.
 
@@ -97,13 +115,16 @@ Playwright hanya diperlukan untuk ujian pembangunan:
 npm install --no-save --package-lock=false playwright
 npx playwright install chromium
 node tests/verify.cjs
+node tests/visual.cjs
 ```
 
 Dependency ujian tidak dimuatkan oleh laman dan tidak diperlukan oleh Vercel. Pemboleh ubah `CHROMIUM_PATH` boleh memilih Chromium yang sudah dipasang.
 
-Ujian mengesahkan input dan hasil sebenar, termasuk bahasa, kawalan papan kekunci, kalkulator, penskalaan, peta, dialog, deploy, pembatalan, Undo, borang dan jeda masa aktif. Ujian fungsi menyekat Google Fonts untuk hasil yang stabil; audit visual fon sebenar dan Lighthouse dilakukan secara berasingan. Skor audit bergantung pada peranti, rangkaian dan cara fon dihantar.
+Ujian visual membandingkan sembilan PNG semasa dengan baseline yang dikomit; ia tidak menerima perubahan secara automatik. Kes ujian merangkumi hero telefon/desktop, dashboard, harga, penskalaan dan status penyedia. Respons API dan jam UTC ditetapkan dalam fixture supaya perubahan status dunia sebenar tidak menyebabkan kegagalan piksel palsu. Perbandingan menggunakan canvas pelayar tanpa dependency penyahkod PNG tambahan. Manifest merekod versi utama Chromium, OS dan mod fon. Gunakan persekitaran yang sama untuk hasil stabil. Selepas perubahan UI atau persekitaran yang memang disengajakan dan telah disemak, jalankan `node tests/visual.cjs --update`, semak PNG baharu, kemudian jalankan semula `node tests/visual.cjs`. Output ujian berada dalam `tests/visual-artifacts/` dan diabaikan oleh Git. `NIMBUS_FONT_CACHE` boleh memilih cache Google Fonts untuk mod baseline berasingan.
 
-Audit akhir pada 6 November 2026 menggunakan Chromium mudah alih dengan sumber sejuk, penghantaran statik termampat dan fail fon sebenar Google yang dicache secara setempat:
+Ujian mengesahkan input dan hasil sebenar, termasuk bahasa, kawalan papan kekunci, kalkulator, penskalaan, peta, dialog, deploy, pembatalan, Undo, borang, CSV yang dimuat turun, jeda pengguna dan jeda masa aktif. API status menggunakan fixture deterministik dalam ujian regresi; sambungan HTTP/CORS rasmi diuji berasingan. Ujian fungsi menyekat Google Fonts untuk hasil yang stabil; audit visual fon sebenar dan Lighthouse dilakukan secara berasingan. Skor audit bergantung pada peranti, rangkaian dan cara fon dihantar.
+
+Audit versi awal pada 6 November 2026 menggunakan Chromium mudah alih dengan sumber sejuk, penghantaran statik termampat dan fail fon sebenar Google yang dicache secara setempat:
 
 | Tema | Performance | Accessibility | SEO | CLS | TBT |
 | --- | --- | --- | --- | --- | --- |
@@ -111,6 +132,8 @@ Audit akhir pada 6 November 2026 menggunakan Chromium mudah alih dengan sumber s
 | Cerah | 97 | 100 | 100 | 0 | 0 ms |
 
 Kependaman rangkaian Google Fonts luar tidak termasuk dalam ukuran tersebut. Semakan visual fon sebenar meliputi 360, 768, 1280 dan 1440px dalam kedua-dua bahasa serta tema; empat audit axe tidak menemui pelanggaran WCAG A/AA. Ujian fungsi penuh lulus tanpa ralat atau amaran konsol dan tanpa permintaan rangkaian yang tidak dijangka.
+
+Audit kemas kini UI dan API pada 7 November 2026 menggunakan kaedah yang sama: Performance **96 tema gelap / 97 tema cerah**, Accessibility **100**, SEO **100** dan CLS **0**. Semua 16 susun atur fon sebenar serta empat audit axe, termasuk padanan label kelihatan, lulus. API tidak diminta pada pemuatan awal dan hanya dimuatkan apabila panelnya kelihatan. Ujian pelayar berasingan dengan respons rangkaian sebenar mengesahkan ketiga-tiga endpoint, pemaparan status, cap masa semakan dan ketiadaan token/cookie. Ujian kegagalan merangkumi timeout, JSON tidak sah, hasil terakhir dan pembatalan apabila tersembunyi.
 
 ## GitHub dan Vercel
 
@@ -126,8 +149,8 @@ Jika menggunakan domain atau repositori sendiri, kemas kini `canonical`, `og:url
 
 ## Penambahbaikan seterusnya
 
-1. Sambungkan metrik kepada API sebenar dengan keadaan memuatkan, ralat dan data kosong yang jelas.
-2. Tambah pemilihan masa carta dan eksport data CSV untuk pemeriksaan sampel.
-3. Tambah ujian regresi tangkapan skrin untuk kedua-dua bahasa, tema dan saiz telefon.
+1. Sambungkan CPU, memori dan trafik kepada API pelayan milik sendiri apabila pelayan sebenar tersedia.
+2. Tambah penapisan julat sampel dan pilihan metrik pada carta.
+3. Jalankan ujian fungsi serta visual secara automatik dalam CI dengan versi Chromium yang dipin.
 
 Created by Putera MY

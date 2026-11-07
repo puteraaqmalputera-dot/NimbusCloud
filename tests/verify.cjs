@@ -8,7 +8,7 @@ const site = process.env.NIMBUS_ROOT || path.resolve(__dirname, '..');
 const files = Object.fromEntries(['index.html', 'styles.css', 'app.js'].map(name => [name, fs.readFileSync(path.join(site, name), 'utf8')]));
 const executablePath = process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined);
 const errors = [], unexpected = [], results = [];
-const exposed = '\nwindow.NimbusTest = { calculatePrice, Clock, CloudModel, t, i18n, setLanguage, missingTranslations };';
+const exposed = '\nlet testChart = null; NimbusState.on("chart-ready", ({chart}) => {testChart = chart;}); window.NimbusTest = { calculatePrice, Clock, CloudModel, t, i18n, setLanguage, missingTranslations, createTrafficCSV, parseProviderStatus, chartSamples: () => testChart?.samples || [] };';
 let browser;
 
 async function open({ locale = 'en-US', width = 1280, motion = 'reduce' } = {}) {
@@ -16,6 +16,11 @@ async function open({ locale = 'en-US', width = 1280, motion = 'reduce' } = {}) 
   await context.route('**/*', route => {
     const url = new URL(route.request().url());
     if (['fonts.googleapis.com', 'fonts.gstatic.com'].includes(url.hostname)) return route.fulfill({ contentType: 'text/css', body: '' });
+    if (['www.vercel-status.com', 'www.githubstatus.com', 'www.cloudflarestatus.com'].includes(url.hostname) && url.pathname === '/api/v2/status.json') {
+      return route.fulfill({ contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({
+        page: { updated_at: '2026-11-01T00:00:00Z' }, status: { indicator: url.hostname === 'www.cloudflarestatus.com' ? 'major' : 'none' }
+      }) });
+    }
     if (url.hostname === 'nimbus.test') {
       const name = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
       if (Object.hasOwn(files, name)) return route.fulfill({ contentType: name.endsWith('.js') ? 'text/javascript' : name.endsWith('.css') ? 'text/css' : 'text/html', body: files[name] + (name === 'app.js' ? exposed : '') });
@@ -109,6 +114,17 @@ async function finishDeploy(page) { await page.waitForFunction(() => !NimbusStat
   await page.locator('[data-region-select=sfo]').click(); assert.equal((await state(page)).region, 'sfo');
   await page.locator('.network-node[data-region=sfo]').focus(); await page.keyboard.press('ArrowRight');
   assert.notEqual((await state(page)).region, 'sfo');
+  await page.locator('#service-status').scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => document.getElementById('provider-vercel').dataset.state === 'operational' && document.getElementById('provider-cloudflare').dataset.state === 'major');
+  assert.equal(await page.locator('#provider-github').getAttribute('data-state'), 'operational');
+  assert.match(await page.locator('#provider-cloudflare .provider-status').textContent(), /Partial outage/);
+  assert(await page.locator('#provider-vercel .provider-checked').getAttribute('datetime'));
+  await page.evaluate(() => NimbusTest.setLanguage('ms'));
+  assert.match(await page.locator('#provider-cloudflare .provider-status').textContent(), /Gangguan sebahagian/);
+  assert.match(await page.locator('#provider-vercel .provider-source').getAttribute('aria-label'), /rasmi Vercel/);
+  await page.evaluate(() => NimbusTest.setLanguage('en'));
+  const invalidStatus = await page.evaluate(() => { try { NimbusTest.parseProviderStatus({ page: {}, status: { indicator: 'invented' } }); return false; } catch { return true; } });
+  assert(invalidStatus, 'Unknown upstream states must not become a healthy status.');
   await page.locator('#faq-q-security').focus(); await page.keyboard.press('Enter');
   assert.equal(await page.locator('.faq-question[aria-expanded=true]').count(), 1);
   assert.equal(await page.locator('#faq-q-security').getAttribute('aria-expanded'), 'true');
@@ -146,6 +162,34 @@ async function finishDeploy(page) { await page.waitForFunction(() => !NimbusStat
   /* Masa aktif: tab tersembunyi tidak menggunakan sela atau kemajuan deploy. */
   const live = await open({ motion: 'no-preference' }); const p = live.page;
   await p.locator('#dashboard').scrollIntoViewIfNeeded(); await p.waitForTimeout(1200);
+  assert.equal(await p.locator('.demo-bar').count(), 0, 'The removed top bar must not return.');
+  assert.equal(await p.locator('.hero-actions .button-primary').getAttribute('href'), '#dashboard');
+  await p.locator('#chart-pause').focus(); await p.keyboard.press('Enter');
+  assert.equal((await state(p)).dashboardPaused, true);
+  const frozenSamples = await p.evaluate(() => NimbusTest.chartSamples());
+  const frozenState = JSON.stringify(await state(p));
+  await p.waitForTimeout(1150);
+  assert.equal(JSON.stringify(await state(p)), frozenState, 'User pause must stop automatic sampling.');
+  assert.deepEqual(await p.evaluate(() => NimbusTest.chartSamples()), frozenSamples);
+  await p.locator('#traffic-chart').focus(); await p.keyboard.press('ArrowLeft');
+  await p.locator('#chart-tooltip:not([hidden])').waitFor();
+  await p.evaluate(() => NimbusTest.setLanguage('ms'));
+  assert.match(await p.locator('#chart-pause').getAttribute('aria-label'), /Sambung/);
+  const expectedCSV = await p.evaluate(() => NimbusTest.createTrafficCSV(NimbusTest.chartSamples()));
+  const downloading = p.waitForEvent('download');
+  await p.locator('#chart-export').click();
+  const download = await downloading;
+  const csv = fs.readFileSync(await download.path(), 'utf8');
+  assert.match(download.suggestedFilename(), /^nimbuscloud-traffic-\d{4}-\d{2}-\d{2}-\d{6}\.csv$/);
+  assert.equal(csv.charCodeAt(0), 0xFEFF);
+  assert.equal(csv, expectedCSV, 'CSV must contain the displayed samples, not newly generated values.');
+  assert.equal(csv.split('\r\n').filter(Boolean).length, 61);
+  assert.match(csv, /Sampel sebelum yang terkini/);
+  await p.locator('#chart-pause').click();
+  assert.equal((await state(p)).dashboardPaused, false);
+  await p.waitForTimeout(1200);
+  assert.notDeepEqual(await p.evaluate(() => NimbusTest.chartSamples()), frozenSamples);
+  await closeToasts(p);
   await hidden(p, true); const paused = JSON.stringify(await state(p)); await p.waitForTimeout(1100);
   assert.equal(JSON.stringify(await state(p)), paused); await hidden(p, false);
   const count = (await state(p)).servers.length; await p.locator('#deploy-button').click();

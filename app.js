@@ -25,10 +25,10 @@ const i18n = {
     "hero.announcement": "Auto-Scaling 2.0",
     "hero.lineOne": "Cloud hosting.",
     "hero.lineTwo": "Limitless scale.",
-    "hero.description": "Run a deployment, change capacity and inspect the response. This dashboard connects every control to one live application state.",
-    "hero.start": "Get Started Free",
+    "hero.description": "Deploy a release. Raise traffic. Watch your infrastructure respond.",
+    "hero.start": "Explore dashboard",
     "hero.how": "See How It Works",
-    "hero.assurance": "No credit card required · 14-day trial",
+    "hero.assurance": "No signup · Runs in your browser",
     "hero.sampleOffer": "Sample offer for this portfolio demo. No account or subscription is created.",
     "hero.shortcut": "Go anywhere. Run any action.",
     "dashboard.address": "app.nimbuscloud.my / overview",
@@ -55,11 +55,11 @@ const i18n = {
     "units.rpsShort": "req/s",
     "dashboard.trafficDescription": "Updates once per second",
     "chart.title": "Network activity",
-    "chart.window": "Last 60 seconds",
-    "chart.accessibleLabel": "Sample incoming traffic over the last 60 seconds. Use the left and right arrow keys to inspect values.",
+    "chart.window": "Latest 60 samples",
+    "chart.accessibleLabel": "Sixty traffic samples generated in your browser. Use the left and right arrow keys to inspect values.",
     "chart.fallback": "A live sample traffic chart. Current incoming traffic is 240 requests per second.",
-    "chart.minuteAgo": "60s ago",
-    "chart.now": "Now",
+    "chart.minuteAgo": "Oldest sample",
+    "chart.now": "Latest",
     "chart.keyboardHelp": "Hover to inspect. Keyboard: focus the chart, then use ← and →.",
     "chart.initialSummary": "Sample traffic is 240 requests per second. Four instances are active.",
     "servers.title": "Active servers",
@@ -295,7 +295,7 @@ const i18n = {
     "footer.source": "Source",
     "footer.readme": "Project README",
     "footer.commands": "Command palette",
-    "footer.copyright": "© 2026 NimbusCloud. Portfolio demo by Putera MY. All platform figures are sample data.",
+    "footer.copyright": "© 2026 NimbusCloud. Portfolio by Putera MY. Dashboard metrics use sample data; provider statuses come from official public APIs.",
     "footer.backTop": "Back to top",
     "nav.menu": "Navigation",
     "nav.close": "Close navigation",
@@ -442,12 +442,12 @@ const i18n = {
     "nav.open": "Buka navigasi",
     "hero.new": "Baharu",
     "hero.announcement": "Auto-Scaling 2.0",
-    "hero.lineOne": "Pengehosan awan.",
+    "hero.lineOne": "Hos di awan.",
     "hero.lineTwo": "Skala tanpa had.",
-    "hero.description": "Jalankan deploy, ubah kapasiti dan periksa tindak balasnya. Setiap kawalan dalam papan pemuka ini berkongsi keadaan aplikasi yang sama.",
-    "hero.start": "Mulakan Percuma",
+    "hero.description": "Deploy keluaran. Naikkan trafik. Lihat kapasiti bertindak balas.",
+    "hero.start": "Buka dashboard",
     "hero.how": "Lihat Cara Berfungsi",
-    "hero.assurance": "Tiada kad kredit diperlukan · Percubaan 14 hari",
+    "hero.assurance": "Tanpa pendaftaran · Terus dalam pelayar",
     "hero.sampleOffer": "Contoh tawaran untuk demo portfolio ini. Tiada akaun atau langganan diwujudkan.",
     "hero.shortcut": "Terus ke bahagian. Jalankan arahan.",
     "dashboard.address": "app.nimbuscloud.my / gambaran",
@@ -474,11 +474,11 @@ const i18n = {
     "units.rpsShort": "permintaan/s",
     "dashboard.trafficDescription": "Dikemas kini setiap saat",
     "chart.title": "Aktiviti rangkaian",
-    "chart.window": "60 saat terakhir",
-    "chart.accessibleLabel": "Contoh trafik masuk sepanjang 60 saat terakhir. Gunakan kekunci anak panah kiri dan kanan untuk memeriksa nilai.",
+    "chart.window": "60 sampel terkini",
+    "chart.accessibleLabel": "Enam puluh sampel trafik dijana dalam pelayar anda. Gunakan kekunci anak panah kiri dan kanan untuk memeriksa nilai.",
     "chart.fallback": "Carta trafik contoh langsung. Trafik masuk semasa ialah 240 permintaan sesaat.",
-    "chart.minuteAgo": "60s lalu",
-    "chart.now": "Kini",
+    "chart.minuteAgo": "Sampel terawal",
+    "chart.now": "Terkini",
     "chart.keyboardHelp": "Tuding untuk periksa. Papan kekunci: fokus pada carta, kemudian gunakan ← dan →.",
     "chart.initialSummary": "Trafik contoh ialah 240 permintaan sesaat. Empat instance sedang aktif.",
     "servers.title": "Pelayan aktif",
@@ -714,7 +714,7 @@ const i18n = {
     "footer.source": "Sumber",
     "footer.readme": "README projek",
     "footer.commands": "Palet arahan",
-    "footer.copyright": "© 2026 NimbusCloud. Demo portfolio oleh Putera MY. Semua angka platform ialah data contoh.",
+    "footer.copyright": "© 2026 NimbusCloud. Portfolio oleh Putera MY. Metrik dashboard menggunakan data contoh; status penyedia datang daripada API awam rasmi.",
     "footer.backTop": "Kembali ke atas",
     "nav.menu": "Navigasi",
     "nav.close": "Tutup navigasi",
@@ -864,7 +864,7 @@ const NimbusState = (() => {
   let data = Object.freeze({
     language: root.lang === 'ms' ? 'ms' : 'en',
     theme: root.dataset.theme === 'light' ? 'light' : 'dark',
-    billing: 'monthly', selectedPlan: null, region: 'sin',
+    billing: 'monthly', selectedPlan: null, region: 'sin', dashboardPaused: false,
     instances: 4, load: 240, traffic: 240, cpu: 60, memory: 1.6,
     latency: 17, autoScaling: true, deploying: false, deployProgress: 0,
     servers: Object.freeze([
@@ -1257,7 +1257,7 @@ function navigateTo(id, { focus = true, history = true } = {}) {
 function setupNavigation() {
   const nav = $('#desktop-nav'), indicator = $('#nav-indicator'), header = $('#site-header');
   const links = $$('[data-nav-link]'), sections = $$('main > section[id]');
-  const groups = { features: 'features', workflow: 'features', scaling: 'features', network: 'features', terminal: 'features', pricing: 'pricing', faq: 'faq', 'get-started': 'faq' };
+  const groups = { features: 'features', workflow: 'features', scaling: 'features', network: 'features', 'service-status': 'features', terminal: 'features', pricing: 'pricing', faq: 'faq', 'get-started': 'faq' };
   let scheduled = false;
   function renderNavigation() {
     scheduled = false;
@@ -1623,6 +1623,8 @@ function boot() {
   setupInteractionRouting();
   if (typeof setupDashboard === 'function') setupDashboard();
   if (typeof setupFeatures === 'function') setupFeatures();
+  setupChartTools();
+  setupProviderStatus();
   root.classList.add('app-ready');
   if (!motionQuery.matches) {
     root.dataset.intro = 'running';
@@ -1634,8 +1636,10 @@ queueMicrotask(boot);
 
 /* 08. Model beban bersama; semua nilai ini ialah data contoh setempat. */
 /* Unit masa ringkas kekal tepat untuk satu atau beberapa saat. */
-i18n.en['chart.point'] = '{seconds}s ago: {traffic} requests per second.';
-i18n.ms['chart.point'] = '{seconds}s lalu: {traffic} permintaan sesaat.';
+i18n.en['chart.point'] = 'Sample offset {seconds}: {traffic} requests per second.';
+i18n.ms['chart.point'] = 'Jarak sampel {seconds}: {traffic} permintaan sesaat.';
+i18n.en['chart.sampleOffset'] = 'Sample offset {count}';
+i18n.ms['chart.sampleOffset'] = 'Jarak sampel {count}';
 
 const CLOUD_CONFIG = Object.freeze({
   capacityPerInstance: 100,
@@ -1740,6 +1744,7 @@ function createTrafficChart({ canvas, container, samples = [] }) {
   let active = false;
   let destroyed = false;
   let initialised = false;
+  let paused = false;
   let animation = null;
   let pendingDraw = null;
   let selected = null;
@@ -1751,7 +1756,6 @@ function createTrafficChart({ canvas, container, samples = [] }) {
   let pixelRatio = 1;
   let colors = {};
   let numberFormatter;
-  let timeFormatter;
 
   const tooltip = $('#chart-tooltip');
   const tooltipTime = $('#chart-tooltip-time');
@@ -1780,7 +1784,6 @@ function createTrafficChart({ canvas, container, samples = [] }) {
     };
     const language = NimbusState.get().language === 'ms' ? 'ms-MY' : 'en-MY';
     numberFormatter = new Intl.NumberFormat(language, { maximumFractionDigits: 0 });
-    timeFormatter = new Intl.RelativeTimeFormat(language, { numeric: 'auto', style: 'short' });
   }
 
   function updateSummary() {
@@ -1854,7 +1857,7 @@ function createTrafficChart({ canvas, container, samples = [] }) {
     context.stroke();
     context.restore();
 
-    const timeText = timeFormatter.format(-seconds, 'second');
+    const timeText = seconds ? t('chart.sampleOffset', { count: formatNumber(seconds) }) : t('chart.now');
     const valueText = `${numberFormatter.format(value)} ${t('units.rpsShort')}`;
     if (tooltipTime.textContent !== timeText) tooltipTime.textContent = timeText;
     if (tooltipValue.textContent !== valueText) tooltipValue.textContent = valueText;
@@ -1952,7 +1955,7 @@ function createTrafficChart({ canvas, container, samples = [] }) {
   }
 
   function push(value) {
-    if (!Number.isFinite(value) || destroyed) return false;
+    if (!Number.isFinite(value) || destroyed || paused) return false;
     previousValues = values.slice();
     values = [...values.slice(1), Math.max(0, value)];
     reveal = 1;
@@ -1961,6 +1964,16 @@ function createTrafficChart({ canvas, container, samples = [] }) {
     if (shift === 0) animate('shift');
     render();
     return true;
+  }
+
+  /* Jeda data mengekalkan pemeriksaan carta dan eksport boleh digunakan. */
+  function setPaused(next) {
+    paused = Boolean(next);
+    animation?.cancel();
+    animation = null;
+    reveal = 1;
+    shift = 1;
+    render();
   }
 
   function setActive(next) {
@@ -1987,8 +2000,8 @@ function createTrafficChart({ canvas, container, samples = [] }) {
     updateSummary();
     if (!initialised) {
       initialised = true;
-      reveal = motionQuery.matches ? 1 : 0;
-      if (!motionQuery.matches) animate('intro');
+      reveal = motionQuery.matches || paused ? 1 : 0;
+      if (!motionQuery.matches && !paused) animate('intro');
     }
     render();
   }
@@ -2074,7 +2087,7 @@ function createTrafficChart({ canvas, container, samples = [] }) {
   unsubscribe.push(NimbusState.on('cpu', updateSummary));
 
   return {
-    push, render, setActive,
+    push, render, setActive, setPaused,
     get samples() { return values.slice(); },
     destroy() {
       if (destroyed) return;
@@ -2283,24 +2296,27 @@ function setupDashboard() {
 
   function syncActivity() {
     active = inView && !document.hidden;
-    dashboard.dataset.live = String(active && !motionQuery.matches);
+    const userPaused = NimbusState.get().dashboardPaused;
+    dashboard.dataset.live = String(active && !motionQuery.matches && !userPaused);
     if (active && !chart) {
       const seed = Array.from({ length: 60 }, (_, index) =>
         Math.max(0, initial.traffic * (0.92 + 0.05 * Math.sin(index * 0.3) + 0.03 * Math.sin(index * 0.71)))
       );
       seed[59] = NimbusState.get().traffic;
       chart = createTrafficChart({ canvas: $('#traffic-chart'), container: $('#chart-container'), samples: seed });
+      chart.setPaused(userPaused);
+      NimbusState.emit('chart-ready', { chart });
     }
-    if (active && chart && chart.samples.at(-1) !== NimbusState.get().traffic) {
+    if (active && chart && !userPaused && chart.samples.at(-1) !== NimbusState.get().traffic) {
       chart.push(NimbusState.get().traffic);
     }
     chart?.setActive(active);
     for (const [animation] of motions) {
       if (motionQuery.matches) animation.finish();
-      else if (active) animation.play();
+      else if (active && !userPaused) animation.play();
       else animation.pause();
     }
-    serverRows.forEach(row => { row.style.animationPlayState = active ? 'running' : 'paused'; });
+    serverRows.forEach(row => { row.style.animationPlayState = active && !userPaused ? 'running' : 'paused'; });
     if (active) render(true);
   }
 
@@ -2309,11 +2325,11 @@ function setupDashboard() {
     if (button) toggleServer(button);
   });
   NimbusState.on('change', ({ changed, source, state }) => {
-    if (changed.some(key => ['cpu', 'memory', 'traffic', 'instances', 'servers'].includes(key))) render();
-    if (active && changed.includes('traffic') && source !== 'sample') chart?.push(state.traffic);
+    if (changed.some(key => ['cpu', 'memory', 'traffic', 'instances', 'servers'].includes(key)) && !(state.dashboardPaused && source === 'sample')) render();
+    if (active && !state.dashboardPaused && changed.includes('traffic') && source !== 'sample') chart?.push(state.traffic);
   });
   NimbusState.on('sample', ({ traffic }) => {
-    if (active) { chart?.push(traffic); heartbeat(); }
+    if (active && !NimbusState.get().dashboardPaused) { chart?.push(traffic); heartbeat(); }
   });
   NimbusState.on('translated', () => { render(true); chart?.render(); });
   NimbusState.on('visibility', syncActivity);
@@ -2323,8 +2339,14 @@ function setupDashboard() {
     syncActivity();
   }, { threshold: 0 });
   observer.observe(dashboard);
-  Clock.add(delta => CloudModel.step(delta), {
+  const liveTick = Clock.add(delta => CloudModel.step(delta), {
     interval: CLOUD_CONFIG.sampleInterval, element: dashboard, motion: true
+  });
+  NimbusState.on('dashboardPaused', ({ value }) => {
+    chart?.setPaused(value);
+    if (value) liveTick.pause();
+    else liveTick.resume();
+    syncActivity();
   });
   render(true);
   deploymentController = createDeploymentController({ dashboard, flipRows });
@@ -2557,12 +2579,14 @@ function setupFeatures() {
 /* 13. Dasar penskalaan berkongsi sampel dengan dashboard. */
 Object.assign(i18n.en, {
   'scaling.policyOff': 'Policy off · capacity is fixed',
+  'scaling.instanceLabel': '{index} {state}. Inspect instance {number}',
   'scaling.reducedExplanation': '{instances} instances serve {traffic} sample requests per second at {cpu}% CPU. Static preview: changing a control applies the policy immediately.',
   'scaling.pressureHelp': 'CPU is above 70%. The policy will add capacity after its cooldown.',
   'scaling.limitHelp': 'All 20 sample instances are active. Reduce traffic to bring CPU below the threshold.'
 });
 Object.assign(i18n.ms, {
   'scaling.policyOff': 'Dasar dimatikan · kapasiti kekal',
+  'scaling.instanceLabel': '{index} {state}. Periksa instance {number}',
   'scaling.reducedExplanation': '{instances} instance melayani {traffic} permintaan contoh sesaat pada {cpu}% CPU. Pratonton statik: perubahan kawalan terus menggunakan dasar penskalaan.',
   'scaling.pressureHelp': 'CPU melebihi 70%. Dasar akan menambah kapasiti selepas sela perubahan.',
   'scaling.limitHelp': 'Semua 20 instance contoh sedang aktif. Kurangkan trafik untuk menurunkan CPU di bawah ambang.'
@@ -2590,7 +2614,7 @@ function setupScaling() {
     const cell = $(`[data-instance="${number}"]`, grid) ||
       $('#instance-template').content.firstElementChild.cloneNode(true);
     cell.dataset.instance = String(number);
-    cell.setAttribute('data-i18n-aria-label', 'scaling.inspectInstance');
+    cell.setAttribute('data-i18n-aria-label', 'scaling.instanceLabel');
     $('.instance-index', cell).textContent = String(number).padStart(2, '0');
     if (!cell.isConnected) grid.append(cell);
     cells.set(number, cell);
@@ -2647,9 +2671,9 @@ function setupScaling() {
       cell.classList.toggle('is-active', nowActive);
       cell.classList.toggle('is-selected', number === selected);
       cell.setAttribute('aria-pressed', String(number === selected));
-      const parameters = { number: formatNumber(number) };
+      const parameters = { number: formatNumber(number), index: String(number).padStart(2, '0'), state: t(nowActive ? 'scaling.active' : 'scaling.inactive') };
       translationParameters.set(cell, parameters);
-      cell.setAttribute('aria-label', t('scaling.inspectInstance', parameters));
+      cell.setAttribute('aria-label', t('scaling.instanceLabel', parameters));
       text($('.instance-state', cell), nowActive ? 'scaling.active' : 'scaling.inactive', {}, force);
       cell.style.animationPlayState = inView && !document.hidden ? 'running' : 'paused';
       if (wasActive === nowActive) return;
@@ -2818,7 +2842,7 @@ function setupCommandPalette() {
     const sections = [
       ['overview', 'nav.overview'], ['features', 'nav.platform'],
       ['workflow', 'footer.workflow'], ['scaling', 'footer.scaling'],
-      ['network', 'footer.network'], ['pricing', 'nav.pricing'],
+      ['network', 'footer.network'], ['service-status', 'providerSection.nav'], ['pricing', 'nav.pricing'],
       ['terminal', 'terminal.windowTitle'], ['faq', 'nav.faq'],
       ['get-started', 'nav.getStarted']
     ];
@@ -3495,3 +3519,456 @@ function setupMicroFeatures() {
   NimbusState.on('translated', () => { renderPolicy(); renderSnapshots(); });
   renderPolicy(); renderSnapshots(); renderVisuals();
 }
+
+/* 17. Kawalan carta dan eksport data daripada sampel yang sedang dipaparkan. */
+Object.assign(i18n.en, {
+  'export.label': 'Export CSV',
+  'export.aria': 'Export CSV: displayed traffic samples',
+  'export.loading': 'Export CSV: the chart is preparing its samples.',
+  'export.empty': 'Export CSV: no traffic samples are available.',
+  'export.success': 'CSV ready',
+  'export.detail': '{count} displayed traffic samples are included in the file.',
+  'export.failed': 'The CSV could not be downloaded. Please try again.',
+  'export.headerNumber': 'Sample number',
+  'export.headerSeconds': 'Samples before latest',
+  'export.headerTraffic': 'Requests per second',
+  'export.headerSource': 'Data type',
+  'chart.pause': 'Pause live updates',
+  'chart.resume': 'Resume live updates',
+  'chart.running': 'Live',
+  'chart.paused': 'Paused',
+  'chart.static': 'Static',
+  'chart.preparing': 'Preparing chart',
+  'chart.empty': 'No samples',
+  'chart.pausedAnnouncement': 'Dashboard updates paused. You can still inspect the chart and export its data.',
+  'chart.resumedAnnouncement': 'Dashboard updates resumed.',
+  'chart.staticAnnouncement': 'The static chart is ready. Reduced motion keeps automatic updates off.',
+  'chart.sampleCount': '{count} samples'
+});
+Object.assign(i18n.ms, {
+  'export.label': 'Eksport CSV',
+  'export.aria': 'Eksport CSV: sampel trafik dipaparkan',
+  'export.loading': 'Eksport CSV: carta sedang menyediakan sampelnya.',
+  'export.empty': 'Eksport CSV: tiada sampel trafik tersedia.',
+  'export.success': 'CSV sedia',
+  'export.detail': '{count} sampel trafik yang dipaparkan dimasukkan dalam fail.',
+  'export.failed': 'CSV tidak dapat dimuat turun. Sila cuba lagi.',
+  'export.headerNumber': 'Nombor sampel',
+  'export.headerSeconds': 'Sampel sebelum yang terkini',
+  'export.headerTraffic': 'Permintaan sesaat',
+  'export.headerSource': 'Jenis data',
+  'chart.pause': 'Jeda kemas kini langsung',
+  'chart.resume': 'Sambung kemas kini langsung',
+  'chart.running': 'Langsung',
+  'chart.paused': 'Dijeda',
+  'chart.static': 'Statik',
+  'chart.preparing': 'Menyediakan carta',
+  'chart.empty': 'Tiada sampel',
+  'chart.pausedAnnouncement': 'Kemas kini dashboard dijeda. Anda masih boleh memeriksa carta dan mengeksport datanya.',
+  'chart.resumedAnnouncement': 'Kemas kini dashboard disambung.',
+  'chart.staticAnnouncement': 'Carta statik sedia. Pilihan gerakan minimum menghentikan kemas kini automatik.',
+  'chart.sampleCount': '{count} sampel'
+});
+
+/* CSV menggunakan titik perpuluhan supaya nilai mudah dibaca oleh perisian. */
+function createTrafficCSV(samples, language = NimbusState.get().language) {
+  const dictionary = i18n[language === 'ms' ? 'ms' : 'en'];
+  const values = samples.filter(Number.isFinite).slice(-60);
+  const quote = value => `"${String(value).replace(/"/g, '""')}"`;
+  const rows = [[
+    dictionary['export.headerNumber'],
+    dictionary['export.headerSeconds'],
+    dictionary['export.headerTraffic'],
+    dictionary['export.headerSource']
+  ]];
+  values.forEach((value, index) => rows.push([
+    index + 1,
+    values.length - index - 1,
+    value.toFixed(3),
+    dictionary['shared.sampleData']
+  ]));
+  return '\uFEFF' + rows.map(row => row.map(quote).join(',')).join('\r\n') + '\r\n';
+}
+
+function setupChartTools() {
+  const exportButton = $('#chart-export');
+  const pauseButton = $('#chart-pause');
+  const mode = $('#chart-mode');
+  const count = $('#chart-sample-count');
+  const urls = new Map();
+  let chart = null;
+  let exporting = false;
+
+  function updateLabel(button, key) {
+    button.setAttribute('data-i18n-aria-label', key);
+    button.setAttribute('data-i18n-title', key);
+    button.dataset.tooltipI18n = key;
+    button.setAttribute('aria-label', t(key));
+    button.title = t(key);
+    const tooltip = $('#tooltip');
+    if (tooltip && (button.getAttribute('aria-describedby') || '').split(/\s+/).includes(tooltip.id)) {
+      tooltip.textContent = t(key);
+    }
+  }
+
+  function render() {
+    const samples = (chart?.samples || []).filter(Number.isFinite).slice(-60);
+    const paused = Boolean(NimbusState.get().dashboardPaused);
+    const ready = samples.length > 0;
+    const key = !chart ? 'chart.preparing' : !ready ? 'chart.empty' : paused ? 'chart.paused' : motionQuery.matches ? 'chart.static' : 'chart.running';
+    if (mode) {
+      mode.dataset.state = !chart ? 'loading' : !ready ? 'empty' : paused ? 'paused' : motionQuery.matches ? 'static' : 'live';
+      if (mode.textContent !== t(key)) bindText(mode, key);
+    }
+    if (count) bindText(count, 'chart.sampleCount', { count: formatNumber(samples.length) });
+    if (!busyButtons.has(exportButton)) exportButton.disabled = exporting || !ready;
+    pauseButton.disabled = !ready;
+    pauseButton.setAttribute('aria-pressed', String(paused));
+    $('use', pauseButton)?.setAttribute('href', paused ? '#icon-play' : '#icon-pause');
+    updateLabel(pauseButton, paused ? 'chart.resume' : 'chart.pause');
+    updateLabel(exportButton, !chart ? 'export.loading' : ready ? 'export.aria' : 'export.empty');
+    const label = $('.button-label', exportButton);
+    if (label && label.textContent !== t('export.label')) bindText(label, 'export.label');
+  }
+
+  function revoke(url) {
+    urls.get(url)?.cancel();
+    urls.delete(url);
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportSamples() {
+    if (exporting) return;
+    const samples = chart?.samples.filter(Number.isFinite).slice(-60) || [];
+    if (!samples.length) {
+      showToast({ title: chart ? 'export.empty' : 'export.loading', type: 'warning' });
+      render();
+      return;
+    }
+    if (typeof Blob !== 'function' || typeof URL.createObjectURL !== 'function') {
+      showToast({ title: 'export.failed', type: 'error' });
+      return;
+    }
+    const restoreFocus = document.activeElement === exportButton;
+    exporting = true;
+    await withFeedback(exportButton, () => {
+      let anchor;
+      let url;
+      try {
+        const csv = createTrafficCSV(samples);
+        url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+        const timestamp = new Date().toISOString();
+        anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `nimbuscloud-traffic-${timestamp.slice(0, 10)}-${timestamp.slice(11, 19).replace(/:/g, '')}.csv`;
+        anchor.hidden = true;
+        document.body.append(anchor);
+        anchor.click();
+        showToast({ title: 'export.success', description: 'export.detail', params: { count: formatNumber(samples.length) } });
+      } catch {
+        showToast({ title: 'export.failed', type: 'error' });
+        /* Kegagalan yang telah diterangkan tidak memaparkan tanda kejayaan. */
+        throw new DOMException('Aborted', 'AbortError');
+      } finally {
+        anchor?.remove();
+        if (url) urls.set(url, Clock.after(0, () => revoke(url)));
+      }
+    });
+    exporting = false;
+    render();
+    if (restoreFocus && document.activeElement === document.body) exportButton.focus({ preventScroll: true });
+  }
+
+  registerAction('chart-export', exportSamples);
+  registerAction('chart-pause', () => {
+    if (!chart) return;
+    const paused = !NimbusState.get().dashboardPaused;
+    NimbusState.update({ dashboardPaused: paused }, 'chart-control');
+    announce(paused ? 'chart.pausedAnnouncement' : motionQuery.matches ? 'chart.staticAnnouncement' : 'chart.resumedAnnouncement');
+  });
+  NimbusState.on('chart-ready', ({ chart: controller }) => { chart = controller; render(); });
+  NimbusState.on('dashboardPaused', render);
+  NimbusState.on('motion', render);
+  NimbusState.on('translated', render);
+  addEventListener('pagehide', () => { [...urls.keys()].forEach(revoke); });
+  render();
+}
+
+/* 18. Status rasmi penyedia dibaca melalui API awam tanpa kunci. */
+const STATUS_SOURCES = Object.freeze([
+  Object.freeze({ id: 'vercel', name: 'Vercel', endpoint: 'https://www.vercel-status.com/api/v2/status.json', statusUrl: 'https://www.vercel-status.com/' }),
+  Object.freeze({ id: 'github', name: 'GitHub', endpoint: 'https://www.githubstatus.com/api/v2/status.json', statusUrl: 'https://www.githubstatus.com/' }),
+  Object.freeze({ id: 'cloudflare', name: 'Cloudflare', endpoint: 'https://www.cloudflarestatus.com/api/v2/status.json', statusUrl: 'https://www.cloudflarestatus.com/' })
+]);
+Object.assign(i18n.en, {
+  'providers.eyebrow': 'Official public APIs',
+  'providers.title': 'Check the infrastructure.',
+  'providers.description': 'Current service status from the providers’ own status pages. These results are separate from the sample dashboard metrics.',
+  'providers.refresh': 'Refresh status',
+  'providers.source': 'Official status',
+  'providers.sourceLabel': 'Source: official {name} status page',
+  'providers.loading': 'Checking',
+  'providers.unknown': 'Not checked',
+  'providers.operational': 'Operational',
+  'providers.minor': 'Degraded service',
+  'providers.major': 'Partial outage',
+  'providers.critical': 'Major outage',
+  'providers.error': 'Unable to verify',
+  'providers.stale': 'Last known status',
+  'providers.checked': 'Checked {time}',
+  'providers.unchecked': 'No verified response yet',
+  'providers.updated': 'Provider update: {time}',
+  'providers.awaiting': 'Waiting for the official source.',
+  'providers.failed': 'The source could not be reached. Open its official page or try again.',
+  'providers.cached': 'The latest refresh failed. The last verified result was {status}.',
+  'providers.refreshing': 'Reading the official status APIs…',
+  'providers.summary': '{count} of {total} sources verified.',
+  'providers.partial': '{count} of {total} sources verified. Some sources are unavailable.',
+  'providers.empty': 'No source could be verified. Try refreshing or open the official status pages.',
+  'providers.schedule': 'Refreshes every 60 seconds while this section is visible. No credentials are sent.',
+  'providers.noUpdateTime': 'The provider did not supply an update time.'
+});
+Object.assign(i18n.ms, {
+  'providers.eyebrow': 'API awam rasmi',
+  'providers.title': 'Semak infrastruktur sebenar.',
+  'providers.description': 'Status perkhidmatan semasa daripada halaman rasmi penyedia. Hasil ini berasingan daripada metrik contoh dashboard.',
+  'providers.refresh': 'Segarkan status',
+  'providers.source': 'Status rasmi',
+  'providers.sourceLabel': 'Sumber: halaman status rasmi {name}',
+  'providers.loading': 'Menyemak',
+  'providers.unknown': 'Belum disemak',
+  'providers.operational': 'Beroperasi',
+  'providers.minor': 'Prestasi terjejas',
+  'providers.major': 'Gangguan sebahagian',
+  'providers.critical': 'Gangguan besar',
+  'providers.error': 'Tidak dapat disahkan',
+  'providers.stale': 'Status terakhir',
+  'providers.checked': 'Disemak {time}',
+  'providers.unchecked': 'Belum ada respons yang disahkan',
+  'providers.updated': 'Kemas kini penyedia: {time}',
+  'providers.awaiting': 'Menunggu sumber rasmi.',
+  'providers.failed': 'Sumber tidak dapat dicapai. Buka halaman rasminya atau cuba lagi.',
+  'providers.cached': 'Semakan terkini gagal. Hasil terakhir yang disahkan ialah {status}.',
+  'providers.refreshing': 'Membaca API status rasmi…',
+  'providers.summary': '{count} daripada {total} sumber disahkan.',
+  'providers.partial': '{count} daripada {total} sumber disahkan. Sesetengah sumber tidak tersedia.',
+  'providers.empty': 'Tiada sumber dapat disahkan. Cuba segarkan atau buka halaman status rasmi.',
+  'providers.schedule': 'Disegarkan setiap 60 saat semasa bahagian ini kelihatan. Tiada kelayakan akses dihantar.',
+  'providers.noUpdateTime': 'Penyedia tidak memberikan masa kemas kini.'
+});
+
+/* Hanya penunjuk yang didokumenkan diterima; teks luaran tidak menjadi HTML. */
+function parseProviderStatus(data) {
+  const indicators = { none: 'operational', minor: 'minor', major: 'major', critical: 'critical' };
+  if (!data || typeof data !== 'object' || Array.isArray(data) || !data.page ||
+      typeof data.page !== 'object' || Array.isArray(data.page) || !data.status || typeof data.status !== 'object' || Array.isArray(data.status) ||
+      !Object.hasOwn(indicators, data.status.indicator)) throw new TypeError('Invalid public status response');
+  const timestamp = typeof data.page.updated_at === 'string' ? Date.parse(data.page.updated_at) : NaN;
+  return Object.freeze({
+    indicator: data.status.indicator,
+    state: indicators[data.status.indicator],
+    updatedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null
+  });
+}
+
+function setupProviderStatus() {
+  const section = $('#service-status');
+  const button = $('#provider-refresh');
+  const overview = $('#provider-overview');
+  const announcement = $('#provider-announcement');
+  const ttl = 60000;
+  const records = STATUS_SOURCES.map(source => ({
+    source, row: $(`[data-provider="${source.id}"]`, section),
+    data: null, checkedAt: null, error: false, loading: false, controller: null, timeout: null
+  }));
+  let visible = false;
+  let destroyed = false;
+  let inFlight = null;
+  let interrupted = false;
+  let firstResult = true;
+  let retryJob = null;
+  const active = () => visible && !document.hidden && !destroyed;
+  const time = value => new Intl.DateTimeFormat(locale(), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  const stateOf = record => record.loading ? 'loading' : record.error ? record.data ? 'stale' : 'error' :
+    record.data ? record.data.state : 'unknown';
+
+  function render() {
+    records.forEach(record => {
+      const { row, source, data } = record;
+      const state = stateOf(record);
+      row.dataset.state = state;
+      row.setAttribute('aria-busy', String(record.loading));
+      $('.provider-name', row).textContent = source.name;
+      bindText($('.provider-status', row), `providers.${state}`);
+      const checked = $('.provider-checked', row);
+      if (record.checkedAt) {
+        checked.setAttribute('datetime', record.checkedAt);
+        bindText(checked, 'providers.checked', { time: time(record.checkedAt) });
+      } else {
+        checked.removeAttribute('datetime');
+        bindText(checked, 'providers.unchecked');
+      }
+      const detail = $('.provider-detail', row);
+      if (record.error) bindText(detail, data ? 'providers.cached' : 'providers.failed',
+        data ? { status: t(`providers.${data.state}`) } : {});
+      else if (data?.updatedAt) bindText(detail, 'providers.updated', { time: time(data.updatedAt) });
+      else bindText(detail, data ? 'providers.noUpdateTime' : 'providers.awaiting');
+      const link = $('.provider-source', row);
+      link.href = source.statusUrl;
+      link.setAttribute('aria-label', t('providers.sourceLabel', { name: source.name }));
+      link.setAttribute('data-i18n-aria-label', 'providers.sourceLabel');
+      translationParameters.set(link, { name: source.name });
+    });
+    const loading = records.some(record => record.loading);
+    const verified = records.filter(record => record.data && !record.error).length;
+    const failed = records.some(record => record.error);
+    bindText(overview, loading ? 'providers.refreshing' : !verified && failed ? 'providers.empty' :
+      failed ? 'providers.partial' : 'providers.summary', {
+      count: formatNumber(verified), total: formatNumber(records.length)
+    });
+    if (!busyButtons.has(button)) {
+      button.disabled = loading;
+      if (loading) button.setAttribute('aria-busy', 'true');
+      else button.removeAttribute('aria-busy');
+    }
+  }
+
+  async function read(record) {
+    const controller = new AbortController();
+    let timedOut = false;
+    record.controller = controller;
+    record.loading = true;
+    record.timeout = Clock.after(8000, () => {
+      timedOut = true;
+      controller.abort();
+    }, { element: section });
+    try {
+      const response = await fetch(record.source.endpoint, {
+        method: 'GET', mode: 'cors', credentials: 'omit',
+        headers: { Accept: 'application/json' }, signal: controller.signal
+      });
+      if (!response.ok) throw new Error('Status source unavailable');
+      const body = await response.text();
+      if (body.length > 65536) throw new TypeError('Status response too large');
+      const data = parseProviderStatus(JSON.parse(body));
+      if (controller.signal.aborted || destroyed) return false;
+      record.data = data;
+      record.checkedAt = new Date().toISOString();
+      record.error = false;
+      return true;
+    } catch {
+      if (!destroyed && (!controller.signal.aborted || timedOut)) record.error = true;
+      return false;
+    } finally {
+      record.timeout?.cancel();
+      record.timeout = null;
+      if (record.controller === controller) record.controller = null;
+      record.loading = false;
+    }
+  }
+
+  function refresh(manual = false) {
+    if (!active()) return Promise.resolve(false);
+    if (inFlight) return inFlight;
+    const now = Date.now();
+    const requested = records.filter(record => manual || !record.checkedAt || now - Date.parse(record.checkedAt) >= ttl);
+    if (!requested.length) { render(); return Promise.resolve(true); }
+    interrupted = false;
+    const pending = requested.map(record => read(record));
+    render();
+    inFlight = Promise.allSettled(pending).then(results => {
+      const succeeded = results.some(result => result.status === 'fulfilled' && result.value);
+      if (active() && (manual || firstResult)) {
+        const verified = records.filter(record => record.data && !record.error).length;
+        bindText(announcement, !verified ? 'providers.empty' : verified < records.length ? 'providers.partial' : 'providers.summary', {
+          count: formatNumber(verified), total: formatNumber(records.length)
+        });
+        firstResult = false;
+      }
+      return succeeded;
+    }).finally(() => {
+      inFlight = null;
+      if (destroyed) return;
+      render();
+      if (interrupted && active()) {
+        retryJob?.cancel();
+        retryJob = Clock.after(0, () => { retryJob = null; refresh(); }, { element: section });
+      }
+    });
+    return inFlight;
+  }
+
+  function stopRequests() {
+    retryJob?.cancel(); retryJob = null;
+    records.forEach(record => {
+      if (record.controller) {
+        interrupted = true;
+        record.controller.abort();
+      }
+      record.timeout?.cancel(); record.timeout = null;
+    });
+  }
+  function sync() {
+    if (active()) refresh();
+    else stopRequests();
+  }
+  const manualRefresh = () => {
+    if (inFlight || !active()) return;
+    withFeedback(button, async () => {
+      if (!await refresh(true)) throw new DOMException('Aborted', 'AbortError');
+    }).finally(render);
+  };
+  registerAction('provider-refresh', manualRefresh);
+  const observer = new IntersectionObserver(entries => {
+    visible = entries[0].isIntersecting;
+    sync();
+  }, { threshold: 0 });
+  observer.observe(section);
+  const poll = Clock.add(() => refresh(), { interval: ttl, element: section });
+  const subscriptions = [NimbusState.on('visibility', sync), NimbusState.on('translated', render)];
+  render();
+  return {
+    refresh,
+    snapshot: () => records.map(record => ({
+      id: record.source.id, state: stateOf(record), checkedAt: record.checkedAt,
+      data: record.data ? { ...record.data } : null
+    })),
+    destroy() {
+      destroyed = true;
+      stopRequests(); poll.cancel(); observer.disconnect();
+      subscriptions.forEach(unsubscribe => unsubscribe());
+      if (actionHandlers.get('provider-refresh') === manualRefresh) actionHandlers.delete('provider-refresh');
+    }
+  };
+}
+
+/* Tajuk dan penerangan untuk panel sumber awam. */
+Object.assign(i18n.en, {
+  'providerSection.eyebrow': 'Public APIs. Real responses.',
+  'providerSection.title': 'Check the infrastructure.',
+  'providerSection.description': 'Current service health from the official Vercel, GitHub and Cloudflare status APIs. Each response keeps its source and check time.',
+  'providerSection.pending': 'Status loads when this section is visible.',
+  'providerSection.notChecked': 'Not checked',
+  'providerSection.waiting': 'Waiting for the official status response.',
+  'providerSection.source': 'Source',
+  'providerSection.vercelSource': "Source: Vercel's official status page",
+  'providerSection.githubSource': "Source: GitHub's official status page",
+  'providerSection.cloudflareSource': "Source: Cloudflare's official status page",
+  'providerSection.cadence': 'Refreshes every 60 seconds while visible. Provider statuses come from public APIs; dashboard metrics use sample data.',
+  'providerSection.nav': 'Provider status'
+});
+Object.assign(i18n.ms, {
+  'providerSection.eyebrow': 'API awam. Respons sebenar.',
+  'providerSection.title': 'Semak infrastruktur sebenar.',
+  'providerSection.description': 'Status perkhidmatan semasa daripada API status rasmi Vercel, GitHub dan Cloudflare. Setiap respons memaparkan sumber serta masa semakan.',
+  'providerSection.pending': 'Status dimuatkan apabila bahagian ini kelihatan.',
+  'providerSection.notChecked': 'Belum disemak',
+  'providerSection.waiting': 'Menunggu respons status rasmi.',
+  'providerSection.source': 'Sumber',
+  'providerSection.vercelSource': 'Sumber: halaman status rasmi Vercel',
+  'providerSection.githubSource': 'Sumber: halaman status rasmi GitHub',
+  'providerSection.cloudflareSource': 'Sumber: halaman status rasmi Cloudflare',
+  'providerSection.cadence': 'Disegarkan setiap 60 saat semasa kelihatan. Status penyedia datang daripada API awam; metrik dashboard menggunakan data contoh.',
+  'providerSection.nav': 'Status penyedia'
+});
+

@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "chromiumMajor": "155",
+  "platform": "linux",
+  "fontMode": "system",
+  "fontFingerprint": "bb052c854f913a2b2f427da9f696352f210746381115096032c7bbb8c15fde18",
+  "deviceScaleFactor": 1,
+  "threshold": 24,
+  "maximumRatio": 0.002,
+  "timezone": "UTC",
+  "frozenTime": "2026-11-07T12:00:00.000Z",
+  "providerFixture": "status-v2-none-none-major",
+  "componentOverlayPolicy": "hide-global-fixed-elements",
+  "cases": {
+    "mobile-dark-ms-hero": {
+      "width": 360,
+      "height": 800,
+      "language": "ms",
+      "theme": "dark",
+      "target": "viewport",
+      "sha256": "63769f2abdb850ba41ae3ceccff452d742b9b8faa583d94d034c1e1ecf672ab9"
+    },
+    "mobile-light-ms-hero": {
+      "width": 360,
+      "height": 800,
+      "language": "ms",
+      "theme": "light",
+      "target": "viewport",
+      "sha256": "a95ed8309a641e0aeaaa06cd8ebdeaca107b732a6ea8927b70708d98a74748b5"
+    },
+    "mobile-dark-en-dashboard": {
+      "width": 360,
+      "height": 800,
+      "language": "en",
+      "theme": "dark",
+      "target": "#dashboard",
+      "sha256": "8789d83c924edaa7b5092a9ac06227be19f20fee805cc0640819c1f54bc70c65"
+    },
+    "mobile-light-en-pricing": {
+      "width": 360,
+      "height": 800,
+      "language": "en",
+      "theme": "light",
+      "target": "#pricing",
+      "sha256": "cf96bd577f63065017d54e87ba4eb71091a995b9e840058f29c1dd3c9477d55c"
+    },
+    "tablet-dark-en-hero": {
+      "width": 768,
+      "height": 900,
+      "language": "en",
+      "theme": "dark",
+      "target": "viewport",
+      "sha256": "b3ad8abf886c82e1bd6c2bf01d1aadbcebdcef55ecd1bc4afd2cc928aaefce63"
+    },
+    "tablet-light-ms-scaling": {
+      "width": 768,
+      "height": 900,
+      "language": "ms",
+      "theme": "light",
+      "target": "#scaling",
+      "sha256": "44a5474a93119de33beaa6b7bab96e3648fa3e3032f0815ffd3dab0bdaa989f9"
+    },
+    "desktop-dark-en-hero": {
+      "width": 1280,
+      "height": 900,
+      "language": "en",
+      "theme": "dark",
+      "target": "viewport",
+      "sha256": "0b1495d2e6a4d4e38ba7d097807fbbbd93d008dc18554b04ca16be374a7f9f77"
+    },
+    "desktop-light-en-hero": {
+      "width": 1280,
+      "height": 900,
+      "language": "en",
+      "theme": "light",
+      "target": "viewport",
+      "sha256": "1180150e5e1040ded1af67e84f3d3d76666b2ee82903906d2c6932ae893e0cba"
+    },
+    "mobile-dark-ms-providers": {
+      "width": 360,
+      "height": 800,
+      "language": "ms",
+      "theme": "dark",
+      "target": "#service-status",
+      "sha256": "d24f287a0ea52e2521fac60fb5ae171e9caaf0436f1b6bad8d0ea15f70c4915b"
+    }
+  }
+}
